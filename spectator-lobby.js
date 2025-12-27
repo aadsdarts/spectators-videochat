@@ -3,7 +3,10 @@ const statusEl = document.getElementById('status');
 const refreshBtn = document.getElementById('refreshBtn');
 
 // Point to the spectator viewer (we preserved the old viewer as viewer.html)
-const spectatorBase = `${window.location.origin}/viewer.html`;
+// GitHub Pages serves from /spectators-videochat/ path
+const spectatorBase = window.location.origin.includes('github.io') 
+    ? `${window.location.origin}/spectators-videochat/viewer.html`
+    : `${window.location.origin}/viewer.html`;
 
 function formatAgo(isoString) {
     const created = new Date(isoString);
