@@ -139,9 +139,18 @@ function setupRealtimeChannel() {
             await createPeerConnection();
         }
 
+        // Pre-allocate transceivers to receive media
+        if (!state.peerConnection.getTransceivers().length) {
+            state.peerConnection.addTransceiver('video', { direction: 'recvonly' });
+            state.peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+            console.log('Added recvonly transceivers');
+        }
+
         await state.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+        console.log('setRemoteDescription OK');
         const answer = await state.peerConnection.createAnswer();
         await state.peerConnection.setLocalDescription(answer);
+        console.log('setLocalDescription OK');
 
         // Send answer
         state.channel.send({
@@ -178,12 +187,21 @@ async function createPeerConnection() {
 
     // Handle remote tracks
     state.peerConnection.ontrack = (event) => {
-        console.log('Received remote track:', event.track.kind);
-        if (!state.remoteStream) {
-            state.remoteStream = new MediaStream();
-            displayRemoteVideo(state.remoteStream);
+        console.log('Received remote track:', event.track.kind, event.streams);
+        if (event.streams && event.streams[0]) {
+            displayRemoteVideo(event.streams[0]);
         }
-        state.remoteStream.addTrack(event.track);
+    };
+
+    // Connection state logging
+    state.peerConnection.onconnectionstatechange = () => {
+        console.log('Connection state:', state.peerConnection.connectionState);
+    };
+    state.peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE connection state:', state.peerConnection.iceConnectionState);
+    };
+    state.peerConnection.onsignalingstatechange = () => {
+        console.log('Signaling state:', state.peerConnection.signalingState);
     };
 
     // Handle ICE candidates
@@ -211,23 +229,19 @@ async function createPeerConnection() {
 
 // Display remote video
 function displayRemoteVideo(stream) {
-    // Remove loading spinner
-    const spinner = videoContainer.querySelector('.loading-spinner');
-    if (spinner) {
-        spinner.remove();
-    }
-
-    // Create or update video element
-    let video = videoContainer.querySelector('video');
-    if (!video) {
-        video = document.createElement('video');
-        video.autoplay = true;
-        video.playsinline = true;
-        videoContainer.insertBefore(video, videoContainer.firstChild);
-    }
-
+    const video = document.getElementById('remoteVideo');
+    const spinner = document.querySelector('.loading-spinner');
+    if (spinner) spinner.style.display = 'none';
     video.srcObject = stream;
-    try { video.play(); } catch {}
+    video.style.display = 'block';
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = false;
+    video.play().catch(e => {
+        console.log('Autoplay blocked:', e);
+        const btn = document.getElementById('playPrompt');
+        if (btn) btn.style.display = 'block';
+    });
 }
 
 // Update participants list

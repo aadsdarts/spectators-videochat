@@ -21,6 +21,8 @@
         <!-- Video Viewer -->
         <div class="video-viewer">
             <div id="videoContainer" class="video-container">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <button id="playPrompt" style="display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding:12px 24px; background:rgba(0,0,0,0.8); color:white; border:2px solid white; border-radius:8px; cursor:pointer; z-index:100;" onclick="document.getElementById('remoteVideo').play(); this.style.display='none';">▶ Start Video</button>
                 <div class="loading-spinner">
                     <div class="spinner"></div>
                     <p>Waiting for video feed...</p>
