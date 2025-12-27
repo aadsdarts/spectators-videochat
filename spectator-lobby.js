@@ -68,10 +68,15 @@ async function fetchLiveRooms() {
     // Probe realtime presence for each room and keep only rooms with
     // at least two non-spectator presences (i.e., both participants online)
     const rooms = data || [];
-    const probeResults = await Promise.all(rooms.map(r => probeRoom(r.room_code)));
+    
+    // Filter out stale rooms older than 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const recentRooms = rooms.filter(r => new Date(r.created_at) > tenMinutesAgo);
+    
+    const probeResults = await Promise.all(recentRooms.map(r => probeRoom(r.room_code)));
     const byRoom = new Map(probeResults.map(x => [x.roomCode, x]));
     // Require at least two participant pongs OR presence count >= 2
-    const liveConnected = rooms.filter(r => {
+    const liveConnected = recentRooms.filter(r => {
         const p = byRoom.get(r.room_code);
         const pongOk = (p?.pongs || 0) >= 2;
         const presenceOk = (p?.presenceCount || 0) >= 2;
@@ -116,7 +121,7 @@ function probeRoom(roomCode) {
                     // Fallback in case 'sync' doesn't fire quickly
                     // Send a ping to solicit pongs from active participants
                     channel.send({ type: 'broadcast', event: 'lobby-ping', payload: { ts: Date.now() } });
-                    setTimeout(finalize, 800);
+                    setTimeout(finalize, 1200);
                 }
             });
         } catch (err) {
