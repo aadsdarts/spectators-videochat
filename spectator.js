@@ -32,7 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
         tokenInput.value = token;
         handleJoinRoom();
     } else {
-        joinModal.style.display = 'flex';
+        // No params: redirect to lobby instead of prompting
+        window.location.href = `${window.location.origin}/`;
+        return;
     }
 
     joinBtn.addEventListener('click', handleJoinRoom);
