@@ -65,7 +65,51 @@ async function fetchLiveRooms() {
         return;
     }
 
-    renderRooms(data || []);
+    // Probe realtime presence for each room and keep only rooms with
+    // at least two non-spectator presences (i.e., both participants online)
+    const rooms = data || [];
+    const presenceResults = await Promise.all(rooms.map(r => getPresenceCount(r.room_code)));
+    const presenceByRoom = new Map(presenceResults.map(x => [x.roomCode, x.count]));
+    const liveConnected = rooms.filter(r => (presenceByRoom.get(r.room_code) || 0) >= 2);
+
+    renderRooms(liveConnected);
+}
+
+// Get presence count (excluding spectators) for a room channel
+function getPresenceCount(roomCode) {
+    return new Promise((resolve) => {
+        let resolved = false;
+        try {
+            const channel = supabaseClient.channel(`room-${roomCode}`, {
+                config: {
+                    broadcast: { self: false },
+                    presence: { key: `lobby-${Math.random().toString(36).slice(2, 9)}` }
+                }
+            });
+
+            const finalize = () => {
+                if (resolved) return;
+                const presenceState = channel.presenceState();
+                const nonSpectatorCount = Object.values(presenceState)
+                    .reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.filter(p => p?.type !== 'spectator').length : 0), 0);
+                resolved = true;
+                // Unsubscribe after computing
+                setTimeout(() => channel.unsubscribe().catch(() => {}), 0);
+                resolve({ roomCode, count: nonSpectatorCount });
+            };
+
+            channel.on('presence', { event: 'sync' }, finalize);
+            channel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // Fallback in case 'sync' doesn't fire quickly
+                    setTimeout(finalize, 600);
+                }
+            });
+        } catch (err) {
+            console.warn('Presence check failed for room', roomCode, err);
+            resolve({ roomCode, count: 0 });
+        }
+    });
 }
 
 async function handleWatch(roomCode) {
