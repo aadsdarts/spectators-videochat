@@ -50,7 +50,7 @@ async function handleJoinRoom() {
     try {
         // Verify spectator token if provided
         if (token) {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('spectators')
                 .select('*')
                 .eq('spectator_token', token)
@@ -73,7 +73,7 @@ async function handleJoinRoom() {
         }
 
         // Verify room exists
-        const { data: room, error: roomError } = await supabase
+        const { data: room, error: roomError } = await supabaseClient
             .from('rooms')
             .select('*')
             .eq('room_code', roomCode)
@@ -102,7 +102,7 @@ async function handleJoinRoom() {
 
 // Setup Realtime channel
 function setupRealtimeChannel() {
-    state.channel = supabase.channel(`room-${state.roomCode}`, {
+    state.channel = supabaseClient.channel(`room-${state.roomCode}`, {
         config: {
             broadcast: { self: true },
             presence: { key: `spectator-${Math.random()}` }
