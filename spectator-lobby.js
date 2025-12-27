@@ -68,17 +68,24 @@ async function fetchLiveRooms() {
     // Probe realtime presence for each room and keep only rooms with
     // at least two non-spectator presences (i.e., both participants online)
     const rooms = data || [];
-    const presenceResults = await Promise.all(rooms.map(r => getPresenceCount(r.room_code)));
-    const presenceByRoom = new Map(presenceResults.map(x => [x.roomCode, x.count]));
-    const liveConnected = rooms.filter(r => (presenceByRoom.get(r.room_code) || 0) >= 2);
+    const probeResults = await Promise.all(rooms.map(r => probeRoom(r.room_code)));
+    const byRoom = new Map(probeResults.map(x => [x.roomCode, x]));
+    // Require at least two participant pongs OR presence count >= 2
+    const liveConnected = rooms.filter(r => {
+        const p = byRoom.get(r.room_code);
+        const pongOk = (p?.pongs || 0) >= 2;
+        const presenceOk = (p?.presenceCount || 0) >= 2;
+        return pongOk || presenceOk;
+    });
 
     renderRooms(liveConnected);
 }
 
 // Get presence count (excluding spectators) for a room channel
-function getPresenceCount(roomCode) {
+function probeRoom(roomCode) {
     return new Promise((resolve) => {
         let resolved = false;
+        let pongs = 0;
         try {
             const channel = supabaseClient.channel(`room-${roomCode}`, {
                 config: {
@@ -95,19 +102,26 @@ function getPresenceCount(roomCode) {
                 resolved = true;
                 // Unsubscribe after computing
                 setTimeout(() => channel.unsubscribe().catch(() => {}), 0);
-                resolve({ roomCode, count: nonSpectatorCount });
+                resolve({ roomCode, presenceCount: nonSpectatorCount, pongs });
             };
+
+            channel.on('broadcast', { event: 'lobby-pong' }, (payload) => {
+                const role = payload?.payload?.role;
+                if (role === 'participant') pongs += 1;
+            });
 
             channel.on('presence', { event: 'sync' }, finalize);
             channel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     // Fallback in case 'sync' doesn't fire quickly
-                    setTimeout(finalize, 600);
+                    // Send a ping to solicit pongs from active participants
+                    channel.send({ type: 'broadcast', event: 'lobby-ping', payload: { ts: Date.now() } });
+                    setTimeout(finalize, 800);
                 }
             });
         } catch (err) {
             console.warn('Presence check failed for room', roomCode, err);
-            resolve({ roomCode, count: 0 });
+            resolve({ roomCode, presenceCount: 0, pongs: 0 });
         }
     });
 }
