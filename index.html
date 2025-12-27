@@ -51,6 +51,22 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js"></script>
+        <script>
+            // Ensure Supabase REST requests negotiate JSON
+            (function(){
+                const origFetch = window.fetch;
+                window.fetch = function(input, init){
+                    const url = typeof input === 'string' ? input : (input && input.url);
+                    init = init || {};
+                    if (url && typeof url === 'string' && url.includes('/rest/v1/') && url.includes((typeof SUPABASE_URL !== 'undefined' ? new URL(SUPABASE_URL).host : '.supabase.co'))){
+                        const hdrs = new Headers(init.headers || {});
+                        if (!hdrs.has('Accept')) hdrs.set('Accept', 'application/json');
+                        init.headers = hdrs;
+                    }
+                    return origFetch.call(this, input, init);
+                };
+            })();
+        </script>
     <script src="spectator.js"></script>
 </body>
 </html>
