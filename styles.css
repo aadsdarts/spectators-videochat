@@ -44,9 +44,23 @@ body {
     color: #aaa;
 }
 
-.video-viewer {
+.split-view {
     flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    overflow: hidden;
+}
+
+.dartconnect-panel {
+    background: #1a1a1a;
+    border-right: 1px solid #444;
+    overflow: hidden;
+}
+
+.video-viewer {
     display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
