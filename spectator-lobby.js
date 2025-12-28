@@ -87,7 +87,6 @@ async function fetchLiveRooms() {
     const liveConnected = recentRooms.filter(r => {
         const p = byRoom.get(r.room_code);
         console.log(`Room ${r.room_code}: pongs=${p?.pongs}, presence=${p?.presenceCount}`);
-        const p = byRoom.get(r.room_code);
         const pongOk = (p?.pongs || 0) >= 2;
         const presenceOk = (p?.presenceCount || 0) >= 2;
         return pongOk || presenceOk;
@@ -169,5 +168,6 @@ async function handleWatch(roomCode) {
 
 refreshBtn.addEventListener('click', fetchLiveRooms);
 document.addEventListener('DOMContentLoaded', fetchLiveRooms);
+
 
 
