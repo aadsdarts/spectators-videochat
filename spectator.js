@@ -169,6 +169,10 @@ function setupRealtimeChannel() {
         console.log('📡 Received offer from participant', payload.payload);
         const offer = payload.payload.offer;
         const participantId = payload.payload.participantId || `participant-${Date.now()}`;
+        
+        console.log('👥 Total peer connections before:', state.peerConnections.length);
+        console.log('👥 Existing participantIds:', state.peerConnections.map(c => c.id));
+        console.log('📺 Video slots status:', state.videoSlots.map((s, i) => `Slot ${i+1}: ${s.participantId || 'empty'}`));
 
         try {
             // Check if we already have a connection for this participant
