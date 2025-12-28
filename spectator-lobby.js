@@ -79,17 +79,21 @@ async function fetchLiveRooms() {
     // Filter out stale rooms older than 10 minutes
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
     const recentRooms = rooms.filter(r => new Date(r.created_at) > tenMinutesAgo);
+    console.log('Recent rooms (last 10 min):', recentRooms);
     
     const probeResults = await Promise.all(recentRooms.map(r => probeRoom(r.room_code)));
     const byRoom = new Map(probeResults.map(x => [x.roomCode, x]));
     // Require at least two participant pongs OR presence count >= 2
     const liveConnected = recentRooms.filter(r => {
         const p = byRoom.get(r.room_code);
+        console.log(`Room ${r.room_code}: pongs=${p?.pongs}, presence=${p?.presenceCount}`);
+        const p = byRoom.get(r.room_code);
         const pongOk = (p?.pongs || 0) >= 2;
         const presenceOk = (p?.presenceCount || 0) >= 2;
         return pongOk || presenceOk;
     });
 
+    console.log('Live connected rooms:', liveConnected);
     renderRooms(liveConnected);
 }
 
@@ -165,4 +169,5 @@ async function handleWatch(roomCode) {
 
 refreshBtn.addEventListener('click', fetchLiveRooms);
 document.addEventListener('DOMContentLoaded', fetchLiveRooms);
+
 
