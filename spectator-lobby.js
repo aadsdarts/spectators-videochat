@@ -4,7 +4,7 @@ const refreshBtn = document.getElementById('refreshBtn');
 
 // Point to the spectator viewer (we preserved the old viewer as viewer.html)
 // GitHub Pages serves from /spectators-videochat/ path
-const spectatorBase = window.location.origin.includes('github.io') 
+const spectatorBase = window.location.origin.includes('github.io')
     ? `${window.location.origin}/spectators-videochat/viewer.html`
     : `${window.location.origin}/viewer.html`;
 
@@ -54,9 +54,9 @@ function renderRooms(rooms) {
 async function fetchLiveRooms() {
     statusEl.textContent = 'Loading';
     liveListEl.innerHTML = '';
-    
+
     console.log('Fetching live rooms from Supabase...');
-    
+
     const { data, error } = await supabaseClient
         .from('rooms')
         .select('room_code, created_at, updated_at')
@@ -71,74 +71,18 @@ async function fetchLiveRooms() {
         return;
     }
 
-    // Probe realtime presence for each room and keep only rooms with
-    // at least two non-spectator presences (i.e., both participants online)
     const rooms = data || [];
     console.log('Rooms from database:', rooms);
-    
-    // Filter out stale rooms older than 10 minutes
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    const recentRooms = rooms.filter(r => new Date(r.created_at) > twoHoursAgo);
-    console.log('Recent rooms (last 10 min):', recentRooms);
-    
-    const probeResults = await Promise.all(recentRooms.map(r => probeRoom(r.room_code)));
-    const byRoom = new Map(probeResults.map(x => [x.roomCode, x]));
-    // Require at least two participant pongs OR presence count >= 2
-    const liveConnected = recentRooms.filter(r => {
-        const p = byRoom.get(r.room_code);
-        console.log(`Room ${r.room_code}: pongs=${p?.pongs}, presence=${p?.presenceCount}`);
-        const pongOk = (p?.pongs || 0) >= 2;
-        const presenceOk = (p?.presenceCount || 0) >= 2;
-        return pongOk || presenceOk;
+
+    // Filter rooms by heartbeat: show only rooms updated in the last 10 minutes
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const liveRooms = rooms.filter(r => {
+        const lastUpdate = r.updated_at ? new Date(r.updated_at) : new Date(r.created_at);
+        return lastUpdate > tenMinutesAgo;
     });
 
-    console.log('Live connected rooms:', liveConnected);
-    renderRooms(liveConnected);
-}
-
-// Get presence count (excluding spectators) for a room channel
-function probeRoom(roomCode) {
-    return new Promise((resolve) => {
-        let resolved = false;
-        let pongs = 0;
-        try {
-            const channel = supabaseClient.channel(`room-${roomCode}`, {
-                config: {
-                    broadcast: { self: false },
-                    presence: { key: `lobby-${Math.random().toString(36).slice(2, 9)}` }
-                }
-            });
-
-            const finalize = () => {
-                if (resolved) return;
-                const presenceState = channel.presenceState();
-                const nonSpectatorCount = Object.values(presenceState)
-                    .reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.filter(p => p?.type !== 'spectator').length : 0), 0);
-                resolved = true;
-                // Unsubscribe after computing
-                setTimeout(() => channel.unsubscribe().catch(() => {}), 0);
-                resolve({ roomCode, presenceCount: nonSpectatorCount, pongs });
-            };
-
-            channel.on('broadcast', { event: 'lobby-pong' }, (payload) => {
-                const role = payload?.payload?.role;
-                if (role === 'participant') pongs += 1;
-            });
-
-            channel.on('presence', { event: 'sync' }, finalize);
-            channel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // Fallback in case 'sync' doesn't fire quickly
-                    // Send a ping to solicit pongs from active participants
-                    channel.send({ type: 'broadcast', event: 'lobby-ping', payload: { ts: Date.now() } });
-                    setTimeout(finalize, 1200);
-                }
-            });
-        } catch (err) {
-            console.warn('Presence check failed for room', roomCode, err);
-            resolve({ roomCode, presenceCount: 0, pongs: 0 });
-        }
-    });
+    console.log('Live rooms (heartbeat < 10 min):', liveRooms);
+    renderRooms(liveRooms);
 }
 
 async function handleWatch(roomCode) {
@@ -168,10 +112,3 @@ async function handleWatch(roomCode) {
 
 refreshBtn.addEventListener('click', fetchLiveRooms);
 document.addEventListener('DOMContentLoaded', fetchLiveRooms);
-
-
-
-
-
-
-
