@@ -73,7 +73,7 @@ function setupPeerConnection() {
         if (event.candidate && state.channel) {
             state.channel.send({
                 type: 'broadcast',
-                event: 'ice-candidate',
+                event: 'spectator-ice',
                 payload: { 
                     token: state.spectatorToken,
                     candidate: event.candidate 
@@ -85,11 +85,17 @@ function setupPeerConnection() {
     state.peerConnection.onconnectionstatechange = () => {
         console.log('Connection:', state.peerConnection.connectionState);
         status.textContent = `Room ${state.roomCode} - ${state.peerConnection.connectionState}`;
+        
+        if (state.peerConnection.connectionState === 'connected') {
+            console.log('✅ Successfully connected to participant');
+        } else if (state.peerConnection.connectionState === 'failed') {
+            console.error('❌ Connection to participant failed');
+        }
     };
 }
 
 function setupRealtimeChannel() {
-    state.channel = supabaseClient.channel(`room:${state.roomCode}`);
+    state.channel = supabaseClient.channel(`room-${state.roomCode}`);
 
     state.channel.on('broadcast', { event: 'offer' }, async (payload) => {
         console.log('📡 Received offer from participant');
@@ -114,11 +120,12 @@ function setupRealtimeChannel() {
         console.log('✅ Sent answer to participant');
     });
 
-    state.channel.on('broadcast', { event: 'ice-candidate' }, async (payload) => {
+    state.channel.on('broadcast', { event: 'participant-ice' }, async (payload) => {
         const candidate = payload.payload.candidate;
         if (candidate && state.peerConnection) {
             try {
                 await state.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log('✅ Added ICE candidate from participant');
             } catch (error) {
                 console.error('ICE error:', error);
             }
