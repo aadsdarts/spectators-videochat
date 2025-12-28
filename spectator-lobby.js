@@ -77,8 +77,8 @@ async function fetchLiveRooms() {
     console.log('Rooms from database:', rooms);
     
     // Filter out stale rooms older than 10 minutes
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    const recentRooms = rooms.filter(r => new Date(r.created_at) > tenMinutesAgo);
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const recentRooms = rooms.filter(r => new Date(r.created_at) > twoHoursAgo);
     console.log('Recent rooms (last 10 min):', recentRooms);
     
     const probeResults = await Promise.all(recentRooms.map(r => probeRoom(r.room_code)));
@@ -168,6 +168,7 @@ async function handleWatch(roomCode) {
 
 refreshBtn.addEventListener('click', fetchLiveRooms);
 document.addEventListener('DOMContentLoaded', fetchLiveRooms);
+
 
 
 
