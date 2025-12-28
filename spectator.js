@@ -2,8 +2,9 @@
 let state = {
     roomCode: null,
     spectatorToken: null,
-    peerConnection: null,
-    channel: null
+    peerConnections: [], // Support multiple participants
+    channel: null,
+    videoSlots: [null, null] // Track which video element has which stream
 };
 
 const status = document.getElementById('status');
@@ -40,7 +41,6 @@ async function joinAsSpectator() {
         
         showNotification('Connecting to live video...', 'info');
 
-        setupPeerConnection();
         setupRealtimeChannel();
 
         leaveBtn.removeAttribute('hidden');
@@ -61,50 +61,54 @@ async function joinAsSpectator() {
     }
 }
 
-function setupPeerConnection() {
-    state.peerConnection = new RTCPeerConnection(RTCConfig);
-
-    state.peerConnection.ontrack = (event) => {
-        console.log('📹 Received video track:', event.track.kind, 'from stream:', event.streams[0].id);
+function createPeerConnectionForParticipant(participantId) {
+    console.log('📡 Creating peer connection for participant:', participantId);
+    
+    const pc = new RTCPeerConnection(RTCConfig);
+    
+    pc.ontrack = (event) => {
+        console.log('📹 Received video track:', event.track.kind, 'from participant:', participantId);
         
         // Hide loading spinner
         const spinner = document.querySelector('.loading-spinner');
         if (spinner) spinner.style.display = 'none';
         
-        if (!remoteVideo1.srcObject) {
+        // Assign to first available video slot
+        if (!state.videoSlots[0]) {
             remoteVideo1.srcObject = event.streams[0];
-            console.log('✅ Set video stream 1');
+            state.videoSlots[0] = event.streams[0];
+            console.log('✅ Set video stream to slot 1');
             remoteVideo1.play().catch(e => {
                 console.log('Autoplay blocked, showing play button');
-                document.getElementById('playPrompt').style.display = 'block';
+                document.getElementById('playPrompt')?.style.setProperty('display', 'block');
             });
             showNotification('Connected! Receiving video...', 'success');
-        } else if (!remoteVideo2.srcObject && event.streams[0] !== remoteVideo1.srcObject) {
+        } else if (!state.videoSlots[1] && event.streams[0] !== state.videoSlots[0]) {
             remoteVideo2.srcObject = event.streams[0];
-            console.log('✅ Set video stream 2');
+            state.videoSlots[1] = event.streams[0];
+            console.log('✅ Set video stream to slot 2');
             remoteVideo2.play().catch(e => console.log('Autoplay blocked for video 2'));
             showNotification('Second participant joined!', 'success');
         }
-
-        document.querySelector('.loading-spinner').style.display = 'none';
     };
 
-    state.peerConnection.onicecandidate = (event) => {
+    pc.onicecandidate = (event) => {
         if (event.candidate && state.channel) {
             state.channel.send({
                 type: 'broadcast',
                 event: 'spectator-ice',
                 payload: { 
                     token: state.spectatorToken,
+                    participantId: participantId,
                     candidate: event.candidate 
                 }
             });
         }
     };
 
-    state.peerConnection.onconnectionstatechange = () => {
-        const connState = state.peerConnection.connectionState;
-        console.log('Connection state:', connState);
+    pc.onconnectionstatechange = () => {
+        const connState = pc.connectionState;
+        console.log(`Connection state for ${participantId}:`, connState);
         
         if (connState === 'connected') {
             console.log('✅ Successfully connected to participant');
@@ -123,53 +127,64 @@ function setupPeerConnection() {
         } else if (connState === 'disconnected') {
             status.textContent = `Disconnected from Room ${state.roomCode}`;
             showNotification('Disconnected from video call', 'error');
-        } else {
-            status.textContent = `Room ${state.roomCode} - ${connState}`;
         }
     };
+    
+    state.peerConnections.push({ id: participantId, pc: pc });
+    return pc;
 }
 
 function setupRealtimeChannel() {
     state.channel = supabaseClient.channel(`room-${state.roomCode}`);
 
     state.channel.on('broadcast', { event: 'offer' }, async (payload) => {
-        console.log('📡 Received offer from participant');
+        console.log('📡 Received offer from participant', payload.payload);
         const offer = payload.payload.offer;
-
-        if (!state.peerConnection) {
-            console.error('No peer connection available');
-            return;
-        }
-
-        // Check if we can accept this offer
-        const signalingState = state.peerConnection.signalingState;
-        if (signalingState !== 'stable' && signalingState !== 'have-local-offer') {
-            console.warn('Ignoring offer - peer connection in wrong state:', signalingState);
-            return;
-        }
+        const participantId = payload.payload.participantId || `participant-${Date.now()}`;
 
         try {
-            // If we have a local offer pending, rollback first
-            if (signalingState === 'have-local-offer') {
-                console.log('Rolling back local offer to accept remote offer');
-                await state.peerConnection.setLocalDescription({ type: 'rollback' });
+            // Check if we already have a connection for this participant
+            let existingConn = state.peerConnections.find(c => c.id === participantId);
+            let pc;
+            
+            if (existingConn) {
+                pc = existingConn.pc;
+                console.log('Using existing connection for:', participantId);
+                
+                // Check if we can accept this offer
+                const signalingState = pc.signalingState;
+                if (signalingState !== 'stable' && signalingState !== 'have-local-offer') {
+                    console.warn('Ignoring offer - peer connection in wrong state:', signalingState);
+                    return;
+                }
+                
+                // If we have a local offer pending, rollback first
+                if (signalingState === 'have-local-offer') {
+                    console.log('Rolling back local offer to accept remote offer');
+                    await pc.setLocalDescription({ type: 'rollback' });
+                }
+            } else {
+                // Create new peer connection for this participant
+                pc = createPeerConnectionForParticipant(participantId);
+                console.log('Created new connection for:', participantId);
             }
 
-            await state.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
             
-            const answer = await state.peerConnection.createAnswer();
-            await state.peerConnection.setLocalDescription(answer);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
 
             state.channel.send({
                 type: 'broadcast',
                 event: 'spectator-answer',
                 payload: { 
                     token: state.spectatorToken,
-                    answer: state.peerConnection.localDescription 
+                    participantId: participantId,
+                    answer: pc.localDescription 
                 }
             });
             
-            console.log('✅ Sent answer to participant');
+            console.log('✅ Sent answer to participant:', participantId);
         } catch (error) {
             console.error('Error handling offer:', error);
         }
@@ -177,12 +192,23 @@ function setupRealtimeChannel() {
 
     state.channel.on('broadcast', { event: 'participant-ice' }, async (payload) => {
         const candidate = payload.payload.candidate;
-        if (candidate && state.peerConnection) {
-            try {
-                await state.peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-                console.log('✅ Added ICE candidate from participant');
-            } catch (error) {
-                console.error('ICE error:', error);
+        const participantId = payload.payload.participantId;
+        
+        if (candidate) {
+            // Find the correct peer connection for this participant
+            const conn = participantId 
+                ? state.peerConnections.find(c => c.id === participantId)
+                : state.peerConnections[state.peerConnections.length - 1]; // fallback to latest
+            
+            if (conn && conn.pc) {
+                try {
+                    await conn.pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log('✅ Added ICE candidate from participant:', participantId);
+                } catch (error) {
+                    console.error('ICE error:', error);
+                }
+            } else {
+                console.warn('No peer connection found for participant:', participantId);
             }
         }
     });
@@ -202,9 +228,14 @@ function setupRealtimeChannel() {
 }
 
 function handleLeaveRoom() {
-    if (state.peerConnection) {
-        state.peerConnection.close();
-    }
+    // Close all peer connections
+    state.peerConnections.forEach(conn => {
+        if (conn.pc) {
+            conn.pc.close();
+        }
+    });
+    state.peerConnections = [];
+    
     if (state.channel) {
         state.channel.unsubscribe();
     }
