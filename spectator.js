@@ -12,6 +12,7 @@ const notification = document.getElementById('notification');
 const remoteVideo1 = document.getElementById('remoteVideo1');
 const remoteVideo2 = document.getElementById('remoteVideo2');
 const leaveBtn = document.getElementById('leaveBtn');
+const refreshBtn = document.getElementById('refreshBtn');
 
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
@@ -32,6 +33,12 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = '/spectators-videochat/';
         });
     }
+    
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            window.location.reload();
+        });
+    }
 });
 
 async function joinAsSpectator() {
@@ -44,6 +51,7 @@ async function joinAsSpectator() {
         setupRealtimeChannel();
 
         leaveBtn.removeAttribute('hidden');
+        refreshBtn.removeAttribute('hidden');
         
         // Auto-hide loading spinner after 30 seconds if no video
         setTimeout(() => {

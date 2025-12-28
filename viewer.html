@@ -14,6 +14,7 @@
             <h1>Spectator View</h1>
             <div class="status-info">
                 <p id="status">Loading...</p>
+                <button id="refreshBtn" type="button" class="btn btn-secondary" hidden>Refresh</button>
                 <button id="leaveBtn" type="button" class="btn btn-danger" hidden>Leave</button>
             </div>
         </div>
@@ -45,7 +46,7 @@
     <div id="notification" class="notification"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js?v=1.2.0"></script>
+    <script src="supabase-config.js?v=1.2.1"></script>
         <script>
             // Ensure Supabase REST requests negotiate JSON
             (function(){
@@ -65,6 +66,6 @@
                 };
             })();
         </script>
-    <script src="spectator.js?v=1.2.0"></script>
+    <script src="spectator.js?v=1.2.1"></script>
 </body>
 </html>
