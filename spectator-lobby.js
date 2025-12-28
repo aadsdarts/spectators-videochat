@@ -39,7 +39,7 @@ function renderRooms(rooms) {
 
         const watchBtn = document.createElement('button');
         watchBtn.className = 'btn watch-btn';
-        watchBtn.textContent = 'Watch';
+        watchBtn.textContent = '▶ Watch Live';
         watchBtn.addEventListener('click', () => handleWatch(room.room_code));
 
         card.appendChild(title);
@@ -115,7 +115,7 @@ async function fetchLiveRooms() {
 
 async function handleWatch(roomCode) {
     try {
-        statusEl.textContent = `Joining room ${roomCode}`;
+        statusEl.textContent = `Connecting to room ${roomCode}...`;
         const token = Math.random().toString(36).substring(2, 12);
         const { error } = await supabaseClient
             .from('spectators')
@@ -124,9 +124,14 @@ async function handleWatch(roomCode) {
                 token: token
             }]);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Database error:', error);
+            throw error;
+        }
 
+        // Navigate to viewer immediately for seamless experience
         const target = `${spectatorBase}?roomCode=${roomCode}&token=${token}`;
+        console.log('🎬 Opening viewer:', target);
         window.location.href = target;
     } catch (err) {
         console.error('Error joining as spectator', err);
