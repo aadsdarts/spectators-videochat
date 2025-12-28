@@ -4,7 +4,10 @@ let state = {
     spectatorToken: null,
     peerConnections: [], // Support multiple participants
     channel: null,
-    videoSlots: [null, null] // Track which video element has which stream
+    videoSlots: [
+        { participantId: null, stream: null },
+        { participantId: null, stream: null }
+    ] // Track which video element has which participant
 };
 
 const status = document.getElementById('status');
@@ -81,22 +84,39 @@ function createPeerConnectionForParticipant(participantId) {
         const spinner = document.querySelector('.loading-spinner');
         if (spinner) spinner.style.display = 'none';
         
-        // Assign to first available video slot
-        if (!state.videoSlots[0]) {
-            remoteVideo1.srcObject = event.streams[0];
-            state.videoSlots[0] = event.streams[0];
-            console.log('✅ Set video stream to slot 1');
-            remoteVideo1.play().catch(e => {
-                console.log('Autoplay blocked, showing play button');
-                document.getElementById('playPrompt')?.style.setProperty('display', 'block');
-            });
-            showNotification('Connected! Receiving video...', 'success');
-        } else if (!state.videoSlots[1] && event.streams[0] !== state.videoSlots[0]) {
-            remoteVideo2.srcObject = event.streams[0];
-            state.videoSlots[1] = event.streams[0];
-            console.log('✅ Set video stream to slot 2');
-            remoteVideo2.play().catch(e => console.log('Autoplay blocked for video 2'));
-            showNotification('Second participant joined!', 'success');
+        // Check if this participant already has a slot
+        const existingSlotIndex = state.videoSlots.findIndex(slot => slot.participantId === participantId);
+        
+        if (existingSlotIndex !== -1) {
+            // Update existing slot
+            console.log(`🔄 Updating video stream for participant ${participantId} in slot ${existingSlotIndex + 1}`);
+            if (existingSlotIndex === 0) {
+                remoteVideo1.srcObject = event.streams[0];
+                state.videoSlots[0].stream = event.streams[0];
+            } else {
+                remoteVideo2.srcObject = event.streams[0];
+                state.videoSlots[1].stream = event.streams[0];
+            }
+        } else {
+            // Assign to first available video slot
+            if (!state.videoSlots[0].participantId) {
+                remoteVideo1.srcObject = event.streams[0];
+                state.videoSlots[0] = { participantId: participantId, stream: event.streams[0] };
+                console.log('✅ Set video stream to slot 1 for participant:', participantId);
+                remoteVideo1.play().catch(e => {
+                    console.log('Autoplay blocked, showing play button');
+                    document.getElementById('playPrompt')?.style.setProperty('display', 'block');
+                });
+                showNotification('Connected! Receiving video...', 'success');
+            } else if (!state.videoSlots[1].participantId) {
+                remoteVideo2.srcObject = event.streams[0];
+                state.videoSlots[1] = { participantId: participantId, stream: event.streams[0] };
+                console.log('✅ Set video stream to slot 2 for participant:', participantId);
+                remoteVideo2.play().catch(e => console.log('Autoplay blocked for video 2'));
+                showNotification('Second participant joined!', 'success');
+            } else {
+                console.warn('⚠️ Both video slots already occupied, ignoring participant:', participantId);
+            }
         }
     };
 
