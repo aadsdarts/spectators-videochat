@@ -51,45 +51,66 @@ function renderRooms(rooms) {
     statusEl.textContent = `${rooms.length} live ${rooms.length === 1 ? 'room' : 'rooms'}`;
 }
 
+// Store active rooms from realtime broadcasts
+let activeRooms = new Map();
+let lobbyChannel = null;
+
 async function fetchLiveRooms() {
-    statusEl.textContent = 'Loading';
-    liveListEl.innerHTML = '';
+    statusEl.textContent = 'Listening for live rooms...';
+    liveListEl.innerHTML = '<div class="empty">Scanning for active rooms...</div>';
 
-    console.log('=== FETCHING LIVE ROOMS ===');
-    console.log('Supabase URL:', supabaseClient.supabaseUrl);
-
-    const { data, error } = await supabaseClient
-        .from('rooms')
-        .select('room_code, created_at, updated_at, is_active')
-        .eq('is_active', true)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('❌ Error loading rooms:', error);
-        console.log('Error code:', error.code);
-        console.log('Error message:', error.message);
-        console.log('Error details:', JSON.stringify(error));
-        statusEl.textContent = 'Error loading rooms';
-        liveListEl.innerHTML = '<div class="empty error">Failed to load live games. Check console for details.</div>';
-        return;
-    }
-
-    const rooms = data || [];
-    console.log(`✅ Found ${rooms.length} total rooms in database:`, rooms);
-
-    // Filter rooms by heartbeat: show only rooms updated in the last 10 minutes
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    console.log('Filtering rooms updated after:', tenMinutesAgo.toISOString());
+    console.log('=== LISTENING FOR ROOM BROADCASTS ===');
     
-    const liveRooms = rooms.filter(r => {
-        const lastUpdate = r.updated_at ? new Date(r.updated_at) : new Date(r.created_at);
-        const isLive = lastUpdate > tenMinutesAgo;
-        console.log(`Room ${r.room_code}: updated ${r.updated_at}, is live: ${isLive}`);
-        return isLive;
-    });
+    // Clear old rooms older than 15 seconds
+    const now = Date.now();
+    for (const [roomCode, data] of activeRooms.entries()) {
+        if (now - data.timestamp > 15000) {
+            activeRooms.delete(roomCode);
+        }
+    }
+    
+    renderRooms(Array.from(activeRooms.values()));
 
-    console.log(`✅ Found ${liveRooms.length} LIVE rooms (updated < 10 min):`, liveRooms);
-    renderRooms(liveRooms);
+    // Subscribe to lobby broadcast channel if not already subscribed
+    if (!lobbyChannel) {
+        lobbyChannel = supabaseClient.channel('lobby-broadcast');
+        
+        lobbyChannel
+            .on('broadcast', { event: 'room-active' }, (payload) => {
+                console.log('📡 Room broadcast received:', payload.payload);
+                const { room_code, timestamp } = payload.payload;
+                
+                activeRooms.set(room_code, {
+                    room_code: room_code,
+                    created_at: new Date(timestamp).toISOString(),
+                    timestamp: timestamp
+                });
+                
+                // Update display
+                renderRooms(Array.from(activeRooms.values()));
+            })
+            .subscribe((status) => {
+                console.log('Lobby channel status:', status);
+                if (status === 'SUBSCRIBED') {
+                    statusEl.textContent = 'Listening for live rooms...';
+                }
+            });
+    }
+    
+    // Auto-refresh to clean old rooms
+    setTimeout(() => {
+        const now = Date.now();
+        let changed = false;
+        for (const [roomCode, data] of activeRooms.entries()) {
+            if (now - data.timestamp > 15000) {
+                activeRooms.delete(roomCode);
+                changed = true;
+            }
+        }
+        if (changed) {
+            renderRooms(Array.from(activeRooms.values()));
+        }
+    }, 5000);
 }
 
 async function handleWatch(roomCode) {
