@@ -101,23 +101,43 @@ function setupRealtimeChannel() {
         console.log('📡 Received offer from participant');
         const offer = payload.payload.offer;
 
-        if (!state.peerConnection) return;
+        if (!state.peerConnection) {
+            console.error('No peer connection available');
+            return;
+        }
 
-        await state.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-        
-        const answer = await state.peerConnection.createAnswer();
-        await state.peerConnection.setLocalDescription(answer);
+        // Check if we can accept this offer
+        const signalingState = state.peerConnection.signalingState;
+        if (signalingState !== 'stable' && signalingState !== 'have-local-offer') {
+            console.warn('Ignoring offer - peer connection in wrong state:', signalingState);
+            return;
+        }
 
-        state.channel.send({
-            type: 'broadcast',
-            event: 'spectator-answer',
-            payload: { 
-                token: state.spectatorToken,
-                answer: state.peerConnection.localDescription 
+        try {
+            // If we have a local offer pending, rollback first
+            if (signalingState === 'have-local-offer') {
+                console.log('Rolling back local offer to accept remote offer');
+                await state.peerConnection.setLocalDescription({ type: 'rollback' });
             }
-        });
-        
-        console.log('✅ Sent answer to participant');
+
+            await state.peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+            
+            const answer = await state.peerConnection.createAnswer();
+            await state.peerConnection.setLocalDescription(answer);
+
+            state.channel.send({
+                type: 'broadcast',
+                event: 'spectator-answer',
+                payload: { 
+                    token: state.spectatorToken,
+                    answer: state.peerConnection.localDescription 
+                }
+            });
+            
+            console.log('✅ Sent answer to participant');
+        } catch (error) {
+            console.error('Error handling offer:', error);
+        }
     });
 
     state.channel.on('broadcast', { event: 'participant-ice' }, async (payload) => {
