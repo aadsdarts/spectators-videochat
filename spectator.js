@@ -73,7 +73,7 @@ function setupPeerConnection() {
         if (event.candidate && state.channel) {
             state.channel.send({
                 type: 'broadcast',
-                event: 'spectator-ice',
+                event: 'ice-candidate',
                 payload: { 
                     token: state.spectatorToken,
                     candidate: event.candidate 
