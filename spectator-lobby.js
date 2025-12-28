@@ -1,4 +1,4 @@
-const liveListEl = document.getElementById('liveList');
+﻿const liveListEl = document.getElementById('liveList');
 const statusEl = document.getElementById('status');
 const refreshBtn = document.getElementById('refreshBtn');
 
@@ -54,7 +54,9 @@ function renderRooms(rooms) {
 async function fetchLiveRooms() {
     statusEl.textContent = 'Loading';
     liveListEl.innerHTML = '';
-
+    
+    console.log('Fetching live rooms from Supabase...');
+    
     const { data, error } = await supabaseClient
         .from('rooms')
         .select('room_code, created_at')
@@ -63,6 +65,7 @@ async function fetchLiveRooms() {
 
     if (error) {
         console.error('Error loading rooms', error);
+        console.log('Error details:', JSON.stringify(error));
         statusEl.textContent = 'Error loading rooms';
         liveListEl.innerHTML = '<div class="empty error">Failed to load live games.</div>';
         return;
@@ -71,6 +74,7 @@ async function fetchLiveRooms() {
     // Probe realtime presence for each room and keep only rooms with
     // at least two non-spectator presences (i.e., both participants online)
     const rooms = data || [];
+    console.log('Rooms from database:', rooms);
     
     // Filter out stale rooms older than 10 minutes
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -161,3 +165,4 @@ async function handleWatch(roomCode) {
 
 refreshBtn.addEventListener('click', fetchLiveRooms);
 document.addEventListener('DOMContentLoaded', fetchLiveRooms);
+
