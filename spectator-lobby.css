@@ -90,6 +90,37 @@ body {
     border-radius: 12px;
     padding: 20px;
     min-height: 400px;
+    position: relative;
+}
+
+.search-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px;
+    color: #9ba3b4;
+}
+
+.loader-spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #222838;
+    border-top: 4px solid #2563eb;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.search-loader p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
 }
 
 .live-list {

@@ -1,6 +1,7 @@
 ﻿const liveListEl = document.getElementById('liveList');
 const statusEl = document.getElementById('status');
 const refreshBtn = document.getElementById('refreshBtn');
+const searchLoader = document.getElementById('searchLoader');
 
 // Point to the spectator viewer (we preserved the old viewer as viewer.html)
 // GitHub Pages serves from /spectators-videochat/ path
@@ -21,10 +22,13 @@ function renderRooms(rooms) {
     liveListEl.innerHTML = '';
 
     if (!rooms || rooms.length === 0) {
-        liveListEl.innerHTML = '<div class="empty">No live games right now. Check back soon.</div>';
-        statusEl.textContent = 'No live rooms';
+        searchLoader.hidden = false;
+        liveListEl.innerHTML = '';
+        statusEl.textContent = 'Searching for live games';
         return;
     }
+
+    searchLoader.hidden = true;
 
     rooms.forEach((room) => {
         const card = document.createElement('div');
@@ -56,8 +60,9 @@ let activeRooms = new Map();
 let lobbyChannel = null;
 
 async function fetchLiveRooms() {
-    statusEl.textContent = 'Listening for live rooms...';
-    liveListEl.innerHTML = '<div class="empty">Scanning for active rooms...</div>';
+    statusEl.textContent = 'Searching for live games';
+    searchLoader.hidden = false;
+    liveListEl.innerHTML = '';
 
     console.log('=== LISTENING FOR ROOM BROADCASTS ===');
     
