@@ -15,7 +15,36 @@ body {
     flex-direction: column;
 }
 
+.logo-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    padding: 20px;
+    background: #0f1115;
+}
+
+.logo {
+    height: 120px;
+    width: auto;
+}
+
+.version-banner {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #007bff;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 1000;
+}
+
 .header {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -53,6 +82,14 @@ body {
 .content {
     flex: 1;
     padding: 16px;
+}
+
+.matches-frame {
+    background: #161922;
+    border: 2px solid #2563eb;
+    border-radius: 12px;
+    padding: 20px;
+    min-height: 400px;
 }
 
 .live-list {

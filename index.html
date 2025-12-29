@@ -8,12 +8,13 @@
 </head>
 <body>
     <div class="container">
+        <div class="logo-section">
+            <img src="images/dartstream-logo.png" alt="Dartstream" class="logo">
+            <img src="images/CGC official logo-1.png" alt="CGC Official" class="logo">
+        </div>
+        
         <header class="header">
-            <div style="position: absolute; top: 10px; left: 10px; z-index: 1000; display: flex; gap: 10px; align-items: center;">
-                <img src="images/dartstream-logo.png" alt="Dartstream" style="height: 50px; width: auto;">
-                <img src="images/CGC official logo-1.png" alt="CGC Official" style="height: 50px; width: auto;">
-            </div>
-            <div style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #007bff; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; z-index: 1000;">V1.3.5</div>
+            <div class="version-banner">V1.3.5</div>
             <div>
                 <h1>Live Games</h1>
                 <p id="status" class="status">Loading live rooms</p>
@@ -22,7 +23,9 @@
         </header>
 
         <main class="content">
-            <div id="liveList" class="live-list"></div>
+            <div class="matches-frame">
+                <div id="liveList" class="live-list"></div>
+            </div>
         </main>
     </div>
 
